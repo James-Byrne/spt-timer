@@ -8643,6 +8643,11 @@ normalize-url@2.0.1:
     query-string "^5.0.1"
     sort-keys "^2.0.0"
 
+nosleep.js@^0.12.0:
+  version "0.12.0"
+  resolved "https://registry.yarnpkg.com/nosleep.js/-/nosleep.js-0.12.0.tgz#a01fddab2c13af357d673928b1f40a9013a4dc08"
+  integrity sha512-9d1HbpKLh3sdWlhXMhU6MMH+wQzKkrgfRkYV0EBdvt99YJfj0ilCJrWRDYG2130Tm4GXbEoTCx5b34JSaP+HhA==
+
 npm-git-info@^1.0.3:
   version "1.0.3"
   resolved "https://registry.yarnpkg.com/npm-git-info/-/npm-git-info-1.0.3.tgz#a933c42ec321e80d3646e0d6e844afe94630e1d5"

@@ -5,6 +5,8 @@ import { action } from '@ember/object';
 
 import { statechart, matchesState } from 'ember-statecharts/computed';
 
+import NoSleep from 'nosleep.js';
+
 function wait(n = 1000) {
   return new Promise(resolve => setTimeout(() => resolve(), n));
 }
@@ -74,6 +76,8 @@ export default class ApplicationController extends Controller {
   @tracked repeat = true;
   @tracked isPaused = false;
 
+  noSleep = new NoSleep();
+
   @matchesState('idle') isIdle;
   @matchesState('setup') gettingReady;
   @matchesState('work') exercising;
@@ -103,6 +107,8 @@ export default class ApplicationController extends Controller {
 
   @action
   send(msg) {
+    if (msg === 'START') this.noSleep.enable();
+    if (msg === 'STOP') this.noSleep.disable();
     this.statechart.send(msg);
   }
 }
