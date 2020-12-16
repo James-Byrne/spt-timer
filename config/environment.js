@@ -4,7 +4,7 @@ module.exports = function(environment) {
   let ENV = {
     modulePrefix: 'spt-timer',
     environment,
-    rootURL: '/',
+    rootURL: 'spt-timer',
     locationType: 'auto',
     EmberENV: {
       FEATURES: {
