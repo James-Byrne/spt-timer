@@ -1,5 +1,32 @@
-{{!-- The following component displays Ember's default welcome message. --}}
-<WelcomePage />
-{{!-- Feel free to remove this! --}}
+<div class="flex flex-col min-h-screen bg-gray-50">
+  <div class="flex justify-center py-6 text-3xl text-white bg-gray-700 border-t-8 border-gray-900">
+    <div>SPT Timer</div>
+  </div>
 
-{{outlet}}
+  <div class="flex flex-col justify-center my-12">
+    <div class="flex justify-center mt-4 text-8xl">{{this.timer}}</div>
+    <div class="flex justify-center mt-6 text-5xl">{{this.stateText}}</div>
+  </div>
+
+  <div class="flex flex-col justify-center mt-10 sm:flex-row">
+    {{#if this.isIdle}}
+      <button type="button" class="px-4 py-2 m-2 border border-black rounded-xl" onclick={{fn this.send "START"}}>
+        Start
+      </button>
+    {{else if this.canPause}}
+      <button type="button" class="px-4 py-2 m-2 border border-black rounded-xl" onclick={{fn this.send "PAUSE"}}>
+        Pause
+      </button>
+    {{else}}
+      <button type="button" class="px-4 py-2 m-2 border border-black rounded-xl" onclick={{fn this.send "RESUME"}}>
+        Resume
+      </button>
+    {{/if}}
+
+    {{#if this.isRunning}}
+      <button type="button" class="px-4 py-2 m-2 border border-black rounded-xl" onclick={{fn this.send "STOP"}}>
+        Stop
+      </button>
+    {{/if}}
+  </div>
+</div>
