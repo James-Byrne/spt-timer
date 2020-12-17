@@ -6,6 +6,7 @@ import { action } from '@ember/object';
 import { statechart, matchesState } from 'ember-statecharts/computed';
 
 import NoSleep from 'nosleep.js';
+import { BEEP } from '../lib/beep';
 
 function wait(n = 1000) {
   return new Promise(resolve => setTimeout(() => resolve(), n));
@@ -19,7 +20,10 @@ function timerConfig(currentState, nextState, durationParam) {
         {
           target: nextState,
           cond: c => c.elapsed >= c[durationParam],
-          actions: c => c.elapsed = 0
+          actions: [
+            c => c.elapsed = 0,
+            c => c.beep.play()
+          ]
         },
         {
           target: currentState,
@@ -46,7 +50,13 @@ const timerMachine = {
   states: {
     idle: {
       on: {
-        START: 'setup'
+        START: {
+          target: 'setup',
+          actions: [
+            c => c.elapsed = 0,
+            c => c.cycles = 0,
+          ]
+        }
       }
     },
     setup: timerConfig('setup', 'work', 'setupDuration'),
@@ -57,7 +67,8 @@ const timerMachine = {
         '': [
           {
             target: 'work',
-            cond: c => c.repeat
+            cond: c => c.repeat,
+            actions: c => c.cycles += 1
           },
           { target: 'idle' }
         ]
@@ -73,9 +84,11 @@ export default class ApplicationController extends Controller {
   @tracked setupDuration = 5;
   @tracked workDuration = 20;
   @tracked restDuration = 40;
+  @tracked cycles = 0;
   @tracked repeat = true;
   @tracked isPaused = false;
 
+  beep = new Audio(BEEP);
   noSleep = new NoSleep();
 
   @matchesState('idle') isIdle;
