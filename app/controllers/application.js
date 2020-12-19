@@ -22,7 +22,13 @@ function timerConfig(currentState, nextState, durationParam) {
           cond: c => c.elapsed >= c[durationParam],
           actions: [
             c => c.elapsed = 0,
-            c => c.beep.play()
+            c => {
+              // on mobile devices we can only play one audio source at a time
+              // so we need to disable no-sleep briefly in order to pay a sound
+              c.noSleep.disable();
+              c.beep.play();
+              c.noSleep.enable();
+            }
           ]
         },
         {
@@ -118,8 +124,16 @@ export default class ApplicationController extends Controller {
     return !(this.isPaused || this.isIdle);
   }
 
+  async setupBeep() {
+    await this.beep.play();
+    this.beep.src = BEEP;
+  }
+
   @action
   send(msg) {
+    // Setup the audio as part of a user interaction so
+    // it will work on iOS devices
+    this.setupBeep();
     if (msg === 'START') this.noSleep.enable();
     if (msg === 'STOP') this.noSleep.disable();
     this.statechart.send(msg);
