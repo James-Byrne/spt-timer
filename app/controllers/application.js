@@ -1,9 +1,11 @@
 import Controller from '@ember/controller';
-import { tracked } from '@glimmer/tracking';
 
 import { action } from '@ember/object';
 
-import { statechart, matchesState } from 'ember-statecharts/computed';
+import { assign, Machine } from 'xstate';
+import { interpreterFor, matchesState, useMachine } from 'ember-statecharts';
+
+import { use } from 'ember-usable';
 
 import NoSleep from 'nosleep.js';
 import { BEEP } from '../lib/beep';
@@ -12,88 +14,110 @@ function wait(n = 1000) {
   return new Promise(resolve => setTimeout(() => resolve(), n));
 }
 
-function timerConfig(currentState, nextState, durationParam) {
-  return {
-    invoke: {
-      src: c => c.isPaused ? wait(200) : wait(1000),
-      onDone: [
-        {
-          target: nextState,
-          cond: c => c.elapsed >= c[durationParam],
-          actions: [
-            c => c.elapsed = 0,
-            c => {
-              // on mobile devices we can only play one audio source at a time
-              // so we need to disable no-sleep briefly in order to pay a sound
-              c.noSleep.disable();
-              c.beep.play();
-              c.noSleep.enable();
-            }
-          ]
-        },
-        {
-          target: currentState,
-          cond: c => !c.isPaused,
-          actions: c => c.elapsed = c.isPaused ? c.elapsed : c.elapsed + 1
-        },
-        { target: currentState }
-      ]
-    },
-    on: {
-      PAUSE: {
-        actions: c => c.isPaused = true
-      },
-      RESUME: {
-        actions: c => c.isPaused = false
-      },
-      STOP: 'idle'
-    }
-  }
-}
-
-const timerMachine = {
+const timerMachine = Machine({
   initial: 'idle',
+  context: {
+    elapsed: 0,
+    setupDuration: 5,
+    workDuration: 20,
+    restDuration: 40,
+    cycles: 0,
+    isPaused: false
+  },
+  on: {
+    PAUSE: { actions: assign({ isPaused: true }) },
+    RESUME: { actions: assign({ isPaused: false }) },
+    STOP: 'idle'
+  },
   states: {
     idle: {
       on: {
         START: {
           target: 'setup',
-          actions: [
-            c => c.elapsed = 0,
-            c => c.cycles = 0,
-          ]
+          actions: assign({ elapsed: 0, cycles: 0 })
         }
       }
     },
-    setup: timerConfig('setup', 'work', 'setupDuration'),
-    work: timerConfig('work', 'rest', 'workDuration'),
-    rest: timerConfig('rest', 'done', 'restDuration'),
-    done: {
-      on: {
-        '': [
+    setup: {
+      invoke: {
+        src: 'tick',
+        onDone: [
           {
             target: 'work',
-            cond: c => c.repeat,
-            actions: c => c.cycles += 1
+            cond: c => c.elapsed >= c.setupDuration,
+            actions: ['resetElapsed', 'playBeep']
           },
-          { target: 'idle' }
+          {
+            target: 'setup',
+            cond: 'isNotPaused',
+            actions: 'incrementElapsed'
+          },
+          'setup'
+        ]
+      }
+    },
+    work: {
+      invoke: {
+        src: 'tick',
+        onDone: [
+          {
+            target: 'rest',
+            cond: c => c.elapsed >= c.workDuration,
+            actions: ['resetElapsed', 'playBeep', 'incrementCycles']
+          },
+          {
+            target: 'work',
+            cond: 'isNotPaused',
+            actions: 'incrementElapsed'
+          },
+          'work'
+        ]
+      }
+    },
+    rest: {
+      on: {
+        SKIP: {
+          target: 'setup',
+          actions: ['resetElapsed', 'playBeep']
+        }
+      },
+      invoke: {
+        src: 'tick',
+        onDone: [
+          {
+            target: 'work',
+            cond: c => c.elapsed >= c.restDuration,
+            actions: ['resetElapsed', 'playBeep']
+          },
+          {
+            target: 'rest',
+            cond: 'isNotPaused',
+            actions: 'incrementElapsed'
+          },
+          'rest'
         ]
       }
     },
   }
-}
+}, {
+  guards: {
+    isNotPaused({ isPaused }) {
+      return !isPaused;
+    }
+  },
+  services: {
+    async tick({ isPaused }) {
+       return isPaused ? wait(200) : wait(1000)
+    }
+  },
+  actions: {
+    resetElapsed: assign({ elapsed: 0 }),
+    incrementElapsed: assign({ elapsed: c => c.elapsed + 1 }),
+    incrementCycles: assign({ cycles: c => c.cycles + 1 }),
+  }
+});
 
 export default class ApplicationController extends Controller {
-  @statechart(timerMachine) statechart;
-
-  @tracked elapsed = 0;
-  @tracked setupDuration = 5;
-  @tracked workDuration = 20;
-  @tracked restDuration = 40;
-  @tracked cycles = 0;
-  @tracked repeat = true;
-  @tracked isPaused = false;
-
   beep = new Audio(BEEP);
   noSleep = new NoSleep();
 
@@ -101,6 +125,47 @@ export default class ApplicationController extends Controller {
   @matchesState('setup') gettingReady;
   @matchesState('work') exercising;
   @matchesState('rest') resting;
+
+  @use statechart = useMachine(timerMachine)
+    .withConfig({
+      actions: {
+        playBeep: async () => {
+          // on mobile devices we can only play one audio source at a time
+          // so we need to disable no-sleep briefly in order to pay a sound
+          this.noSleep.disable();
+          await this.beep.play();
+          this.noSleep.enable();
+        }
+      }
+    });
+
+  get machine() {
+    return interpreterFor(this.statechart);
+  }
+
+  get cycles() {
+    return this.machine.state.context.cycles;
+  }
+
+  get elapsed() {
+    return this.machine.state.context.elapsed;
+  }
+
+  get setupDuration() {
+    return this.machine.state.context.setupDuration;
+  }
+
+  get workDuration() {
+    return this.machine.state.context.workDuration;
+  }
+
+  get restDuration() {
+    return this.machine.state.context.restDuration;
+  }
+
+  get isPaused() {
+    return this.machine.state.context.isPaused;
+  }
 
   get timer() {
     if (this.gettingReady) return this.setupDuration - this.elapsed;

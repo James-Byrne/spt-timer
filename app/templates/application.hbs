@@ -27,6 +27,12 @@
       </button>
     {{/if}}
 
+    {{#if this.resting}}
+      <button type="button" class="px-4 py-2 m-2 border border-black rounded-xl" onclick={{fn this.send "SKIP"}}>
+        Skip
+      </button>
+    {{/if}}
+
     {{#if this.isRunning}}
       <button type="button" class="px-4 py-2 m-2 border border-black rounded-xl" onclick={{fn this.send "STOP"}}>
         Stop
